@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from openai import OpenAI
+from google import genai  # type: ignore
+from google.genai import types
 import os
 from dotenv import load_dotenv
 from typing import Optional
@@ -21,9 +22,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize OpenAI client
-client = OpenAI()
+  
+# Initialize Google Generative AI client
+client = genai.Client()
 
 
 # Load personality details
@@ -62,21 +63,21 @@ async def chat(request: ChatRequest):
         # Generate session ID if not provided
         session_id = request.session_id or str(uuid.uuid4())
 
-        # Create system message with personality
-        # NOTE: No memory - each request is independent!
-        messages = [
-            {"role": "system", "content": PERSONALITY},
-            {"role": "user", "content": request.message},
-        ]
-
-        # Call OpenAI API
-        response = client.chat.completions.create(
-            model="gpt-4o-mini", 
-            messages=messages
-        )
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text=request.message)]
+                )
+            ],
+            config=types.GenerateContentConfig(
+                system_instruction=PERSONALITY
+            )
+          )
 
         return ChatResponse(
-            response=response.choices[0].message.content, 
+            response=response.text, 
             session_id=session_id
         )
 
